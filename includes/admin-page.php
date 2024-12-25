@@ -1,33 +1,12 @@
 <?php
-/*
-Plugin Name: SEO Images ALT Generator
-Description: Añade automáticamente atributos ALT a imágenes que no lo tienen, basados en el nombre de la página o entrada.
-Version: 1.0
-Author: Héctor Nevado (@hnevado.dev)
-*/
-
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-// Definir constantes
-define('SEO_IMAGES_PATH', plugin_dir_path(__FILE__));
-define('SEO_IMAGES_URL', plugin_dir_url(__FILE__));
-
-// Cargar archivos requeridos
-require_once SEO_IMAGES_PATH . 'includes/admin-page.php';
-require_once SEO_IMAGES_PATH . 'includes/functions.php';
-
-// Hooks iniciales
-add_action('admin_menu', 'seo_images_add_menu');
-
-/*
-if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly
-}
-
-// Agregar el menú en el administrador
-add_action('admin_menu', function () {
+/**
+ * Agregar el menú al administrador
+ */
+function seo_images_add_menu() {
     add_menu_page(
         'SEO Images',
         'SEO Images',
@@ -37,34 +16,35 @@ add_action('admin_menu', function () {
         'dashicons-format-image',
         6
     );
-});
+}
 
-// Función para mostrar el listado de imágenes sin ALT
+/**
+ * Mostrar la página de configuración del plugin
+ */
 function seo_images_page() {
+    
     global $wpdb;
 
-    // Consulta para obtener las entradas y páginas con contenido
     $posts = $wpdb->get_results("
         SELECT ID, post_title, post_content
         FROM {$wpdb->prefix}posts
         WHERE post_type IN ('post', 'page') AND post_status = 'publish'
     ");
 
+    //Inicializamos array
     $images_without_alt = [];
 
-    // Analizar el contenido de cada entrada/página
     foreach ($posts as $post) {
+        //Buscamos  todas las etiquetas <img> en el contenido del post y y verificamos si el atributo alt está presente pero vacío o ausente.
         if (preg_match_all('/<img[^>]*src=["\']([^"\']+)["\'][^>]*alt=["\']?["\']?[^>]*>/i', $post->post_content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $img) {
                 $src = $img[1];
                 $alt_attr = '';
 
-                // Extraer el valor del atributo ALT si existe
                 if (preg_match('/alt=["\']([^"\']*)["\']/', $img[0], $alt_match)) {
                     $alt_attr = $alt_match[1];
                 }
 
-                // Si el ALT está vacío, agregarlo a la lista
                 if (empty($alt_attr)) {
                     $images_without_alt[] = [
                         'post_id' => $post->ID,
@@ -76,7 +56,6 @@ function seo_images_page() {
         }
     }
 
-    // Mostrar la página del plugin
     echo '<div class="wrap">';
     echo '<h1>SEO Images ALT Generator</h1>';
     echo '<table class="widefat">';
@@ -103,43 +82,12 @@ function seo_images_page() {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_alt']) && $_POST['generate_alt'] == '1') {
-        seo_generate_alt($images_without_alt);
+        $updated_count = seo_generate_alt($images_without_alt);
+
+        echo '<div class="notice notice-success">';
+        echo '<p>Se actualizaron ' . $updated_count . ' imágenes con atributos ALT.</p>';
+        echo '</div>';
     }
 
     echo '</div>';
 }
-
-// Función para generar los ALT
-function seo_generate_alt($images) {
-    $updated_count = 0;
-
-    foreach ($images as $image) {
-        $post_id = $image['post_id'];
-        $post_content = get_post_field('post_content', $post_id);
-        $post_title = get_the_title($post_id);
-        $image_src = $image['image_src'];
-
-        // Actualizar solo el atributo ALT en el contenido
-        $updated_content = preg_replace_callback(
-            '/(<img[^>]*src=["\']' . preg_quote($image_src, '/') . '["\'][^>]*?)alt=["\']?[^"\']*["\']?([^>]*>)/i',
-            function ($matches) use ($post_title) {
-                return $matches[1] . 'alt="' . esc_attr($post_title) . '" ' . $matches[2];
-            },
-            $post_content
-        );
-
-        if ($updated_content !== $post_content) {
-            wp_update_post([
-                'ID' => $post_id,
-                'post_content' => $updated_content,
-            ]);
-            $updated_count++;
-        }
-    }
-
-    echo '<div class="notice notice-success">';
-    echo '<p>Se actualizaron ' . $updated_count . ' imágenes con atributos ALT.</p>';
-    echo '</div>';
-}
-*/
-?>
