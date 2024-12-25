@@ -76,12 +76,19 @@ function seo_images_page() {
 
     if (!empty($images_without_alt)) {
         echo '<form method="post">';
+        echo wp_nonce_field('seo_generate_alt_action', 'seo_generate_alt_nonce');
         echo '<input type="hidden" name="generate_alt" value="1">';
         echo '<button type="submit" class="button button-primary">Generar ALT</button>';
         echo '</form>';
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_alt']) && $_POST['generate_alt'] == '1') {
+
+         // Protección CSRF
+        if (!isset($_POST['seo_generate_alt_nonce']) || !wp_verify_nonce($_POST['seo_generate_alt_nonce'], 'seo_generate_alt_action')) {
+            wp_die('La validación CSRF ha fallado. Por favor, intenta de nuevo.');
+        }
+
         $updated_count = seo_generate_alt($images_without_alt);
 
         echo '<div class="notice notice-success">';
