@@ -28,3 +28,6 @@
 
 <h2>Descripción técnica</h2>
 <p>Este plugin realiza una consulta a la base de datos para obtener todas las entradas y páginas publicadas. Luego, analiza el contenido de cada entrada/página buscando imágenes sin el atributo <code>alt</code>. Si se encuentra una imagen sin este atributo, el plugin generará un valor para el atributo <code>alt</code> utilizando el título de la entrada o página donde se encuentra la imagen.</p>
+
+<h2>Compatibilidad Wordpress</h2>
+<p>Este plugin ha sido probado en la rama 6.x de Wordpress</p>
