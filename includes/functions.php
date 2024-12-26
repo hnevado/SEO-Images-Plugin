@@ -38,6 +38,20 @@ function seo_generate_alt($images) {
             ]);
             $updated_count++;
         }
+
+        // Actualizar el ALT de la imagen destacada (thumbnail)
+        $thumbnail_id = get_post_thumbnail_id($post_id); // ID de la imagen destacada
+        $thumbnail_url = wp_get_attachment_url($thumbnail_id); // URL de la imagen destacada
+
+        if ($thumbnail_id && $thumbnail_url === $image_src) {
+            $existing_alt = get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true);
+
+            if (empty($existing_alt)) {
+                update_post_meta($thumbnail_id, '_wp_attachment_image_alt', $post_title);
+                $updated_count++;
+            }
+        }
+        
     }
 
     return $updated_count;

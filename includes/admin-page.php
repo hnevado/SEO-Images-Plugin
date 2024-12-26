@@ -17,25 +17,91 @@ function seo_images_add_menu() {
         6
     );
 }
+add_action('admin_menu', 'seo_images_add_menu');
 
 /**
  * Mostrar la página de configuración del plugin
  */
 function seo_images_page() {
-    
     global $wpdb;
 
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_alt']) && $_POST['generate_alt'] == '1') {
+
+        // Protección CSRF
+        if (!isset($_POST['seo_generate_alt_nonce']) || !wp_verify_nonce($_POST['seo_generate_alt_nonce'], 'seo_generate_alt_action')) {
+            wp_die('La validación CSRF ha fallado. Por favor, intenta de nuevo.');
+        }
+
+        // Llamada a la función de generación de ALT
+        $images_without_alt = seo_get_images_without_alt(); 
+        $updated_count = seo_generate_alt($images_without_alt);
+
+        // Mostrar notificación de éxito
+        add_settings_error(
+            'seo_images_messages',
+            'seo_images_message',
+            "Se actualizaron $updated_count imágenes con atributos ALT.",
+            'updated'
+        );
+    }
+
+    // Obtener imágenes sin ALT
+    $images_without_alt = seo_get_images_without_alt();
+
+    // Mostrar notificaciones (si las hay)
+    settings_errors('seo_images_messages');
+
+    ?>
+    <div class="wrap">
+        <h1>SEO Images ALT Generator</h1>
+        <table class="widefat">
+            <thead>
+                <tr><th>URL Imagen</th><th>Ubicación</th></tr>
+            </thead>
+            <tbody>
+                <?php if (empty($images_without_alt)) : ?>
+                    <tr>
+                        <td colspan="2">No hay imágenes sin atributo ALT insertadas en páginas o entradas.</td>
+                    </tr>
+                <?php else : ?>
+                    <?php foreach ($images_without_alt as $image): ?>
+                        <tr>
+                            <td><a href="<?php echo esc_url($image['image_src']); ?>" target="_blank"><?php echo esc_url($image['image_src']); ?></a></td>
+                            <td><a href="<?php echo get_permalink($image['post_id']); ?>" target="_blank"><?php echo esc_html($image['post_title']); ?></a></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+
+        <?php if (!empty($images_without_alt)) : ?>
+            <form method="POST">
+                <?php wp_nonce_field('seo_generate_alt_action', 'seo_generate_alt_nonce'); ?>
+                <input type="hidden" name="generate_alt" value="1">
+                <button type="submit" class="button button-primary">Generar ALT</button>
+            </form>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Obtener imágenes sin atributo ALT
+ */
+function seo_get_images_without_alt() {
+    global $wpdb;
+
+    // Consultar entradas y páginas publicadas
     $posts = $wpdb->get_results("
         SELECT ID, post_title, post_content
         FROM {$wpdb->prefix}posts
         WHERE post_type IN ('post', 'page') AND post_status = 'publish'
     ");
 
-    //Inicializamos array
     $images_without_alt = [];
 
     foreach ($posts as $post) {
-        //Buscamos  todas las etiquetas <img> en el contenido del post y y verificamos si el atributo alt está presente pero vacío o ausente.
+        // Analizar imágenes en el contenido
         if (preg_match_all('/<img[^>]*src=["\']([^"\']+)["\'][^>]*alt=["\']?["\']?[^>]*>/i', $post->post_content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $img) {
                 $src = $img[1];
@@ -54,47 +120,22 @@ function seo_images_page() {
                 }
             }
         }
-    }
 
-    echo '<div class="wrap">';
-    echo '<h1>SEO Images ALT Generator</h1>';
-    echo '<table class="widefat">';
-    echo '<thead><tr><th>URL Imagen</th><th>Ubicación</th></tr></thead><tbody>';
+        // Analizar la imagen destacada
+        $thumbnail_id = get_post_thumbnail_id($post->ID);
+        if ($thumbnail_id) {
+            $thumbnail_url = wp_get_attachment_url($thumbnail_id);
+            $thumbnail_alt = get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true);
 
-    if (empty($images_without_alt)) {
-        echo '<tr><td colspan="2">No hay imágenes sin atributo ALT insertadas en páginas o entradas.</td></tr>';
-    } else {
-        foreach ($images_without_alt as $image) {
-            echo '<tr>';
-            echo '<td><a href="' . esc_url($image['image_src']) . '" target="_blank">' . esc_url($image['image_src']) . '</a></td>';
-            echo '<td><a href="' . get_permalink($image['post_id']) . '" target="_blank">' . esc_html($image['post_title']) . '</a></td>';
-            echo '</tr>';
+            if (empty($thumbnail_alt)) {
+                $images_without_alt[] = [
+                    'post_id' => $post->ID,
+                    'post_title' => $post->post_title,
+                    'image_src' => $thumbnail_url,
+                ];
+            }
         }
     }
 
-    echo '</tbody></table>';
-
-    if (!empty($images_without_alt)) {
-        echo '<form method="post">';
-        echo wp_nonce_field('seo_generate_alt_action', 'seo_generate_alt_nonce');
-        echo '<input type="hidden" name="generate_alt" value="1">';
-        echo '<button type="submit" class="button button-primary">Generar ALT</button>';
-        echo '</form>';
-    }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_alt']) && $_POST['generate_alt'] == '1') {
-
-         // Protección CSRF
-        if (!isset($_POST['seo_generate_alt_nonce']) || !wp_verify_nonce($_POST['seo_generate_alt_nonce'], 'seo_generate_alt_action')) {
-            wp_die('La validación CSRF ha fallado. Por favor, intenta de nuevo.');
-        }
-
-        $updated_count = seo_generate_alt($images_without_alt);
-
-        echo '<div class="notice notice-success">';
-        echo '<p>Se actualizaron ' . $updated_count . ' imágenes con atributos ALT.</p>';
-        echo '</div>';
-    }
-
-    echo '</div>';
+    return $images_without_alt;
 }
